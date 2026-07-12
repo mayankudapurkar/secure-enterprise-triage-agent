@@ -67,8 +67,9 @@ def setup_agent_engine_telemetry() -> None:
     ):
         return
 
-    import google.auth
-    from vertexai.agent_engines.templates.adk import _default_instrumentor_builder
-
-    _, project_id = google.auth.default()
-    _default_instrumentor_builder(project_id, enable_tracing=True, enable_logging=True)
+    try:
+        _, project_id = google.auth.default()
+        _default_instrumentor_builder(project_id, enable_tracing=True, enable_logging=True)
+    except Exception as e:
+        import logging
+        logging.warning(f"Skipping Agent Engine telemetry setup: {e}")

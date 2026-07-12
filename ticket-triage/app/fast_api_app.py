@@ -39,9 +39,18 @@ load_dotenv()
 setup_telemetry()
 # Must run before get_fast_api_app to set the tracer provider resource.
 setup_agent_engine_telemetry()
-_, project_id = google.auth.default()
-logging_client = google_cloud_logging.Client()
-logger = logging_client.logger(__name__)
+# Fall back to standard logging if Google Cloud credentials are not set up
+import logging
+logger = logging.getLogger(__name__)
+project_id = None
+
+if os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true":
+    try:
+        _, project_id = google.auth.default()
+        logging_client = google_cloud_logging.Client()
+        logger = logging_client.logger(__name__)
+    except Exception as e:
+        print(f"Skipping Google Cloud Logging setup (using standard logging): {e}")
 allow_origins = (
     os.getenv("ALLOW_ORIGINS", "").split(",") if os.getenv("ALLOW_ORIGINS") else None
 )
@@ -104,7 +113,10 @@ def collect_feedback(feedback: Feedback) -> dict[str, str]:
     Returns:
         Success message
     """
-    logger.log_struct(feedback.model_dump(), severity="INFO")
+    if hasattr(logger, "log_struct"):
+        logger.log_struct(feedback.model_dump(), severity="INFO")
+    else:
+        logger.info(f"Feedback structure: {feedback.model_dump()}")
     return {"status": "success"}
 
 

@@ -41,6 +41,20 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
         nonlocal runtime, streaming_methods, sync_methods
         if runtime is None:
             from app.agent import app as adk_app
+            import os
+            from google.cloud.aiplatform import initializer
+            from google.cloud.aiplatform.utils import resource_manager_utils
+
+            # Save original env vars
+            orig_use_vertexai = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI")
+            orig_use_enterprise = os.environ.get("GOOGLE_GENAI_USE_ENTERPRISE")
+            orig_cloud_project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+
+            # Monkeypatch project ID and config
+            AdkApp.project_id = lambda self: os.environ.get("GOOGLE_CLOUD_PROJECT") or "local-project"
+            initializer.global_config._project = os.environ.get("GOOGLE_CLOUD_PROJECT") or "local-project"
+            initializer.global_config._location = os.environ.get("GOOGLE_CLOUD_LOCATION") or "us-central1"
+            resource_manager_utils.get_project_id = lambda project, credentials=None: project or "local-project"
 
             # Reuse the process-wide services so sessions created here are
             # visible to the adk_api and A2A paths, and vice versa (see services.py).
@@ -50,6 +64,25 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
                 artifact_service_builder=services.get_artifact_service,
             )
             runtime.set_up()
+
+            # Restore original env vars (e.g. if they were None/unset, pop them)
+            # This prevents set_up's os.environ mutations from forcing the agents
+            # to run in Vertex AI mode.
+            if orig_use_vertexai is None:
+                os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
+            else:
+                os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = orig_use_vertexai
+
+            if orig_use_enterprise is None:
+                os.environ.pop("GOOGLE_GENAI_USE_ENTERPRISE", None)
+            else:
+                os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = orig_use_enterprise
+
+            if orig_cloud_project is None:
+                os.environ.pop("GOOGLE_CLOUD_PROJECT", None)
+            else:
+                os.environ["GOOGLE_CLOUD_PROJECT"] = orig_cloud_project
+
             operations = runtime.register_operations()
             streaming_methods = set(operations.get("stream", [])) | set(
                 operations.get("async_stream", [])
