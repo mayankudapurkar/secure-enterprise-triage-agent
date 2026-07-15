@@ -1,4 +1,4 @@
-# ShieldGate Triage: Secure Multi-Agent Enterprise Database Triage
+# ShieldGate Triage: Secure Multi-Agent Enterprise Triage
 
 ShieldGate Triage is a secure database logging and triage system built on Google's ADK 2.0 framework. It separates the execution of database operations from raw user inputs by introducing a security guardrail layer that validates prompts against injections before triggering database logging.
 
